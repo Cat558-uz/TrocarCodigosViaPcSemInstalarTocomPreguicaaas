@@ -5,12 +5,11 @@ local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
 local allowedUsers = {
 	["kit_cynALT"] = true,
-	["Xingling858"] = true,
+	[12345678] = true,
 	[23456789] = true,
 	[34567890] = true,
 	[45678901] = true,
@@ -32,7 +31,6 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = CoreGui
 
 local selectedPlayer
-local viewing = false
 
 local function getChar(plr)
 	return plr.Character
@@ -71,10 +69,10 @@ local function fling(plr)
 	local root = getRoot(getChar(plr))
 	if root then
 		local bv = Instance.new("BodyVelocity")
-		bv.Velocity = Vector3.new(99999,99999,99999)
+		bv.Velocity = Vector3.new(1,1,1) * 5000
 		bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 		bv.Parent = root
-		game.Debris:AddItem(bv, 0.5)
+		game:GetService("Debris"):AddItem(bv, 0.3)
 	end
 end
 
@@ -143,17 +141,33 @@ createButton(scroll,"Kick",function(plr)
 	kick(plr, "Admin command")
 end)
 
-Mouse.Button1Down:Connect(function()
+local function getPlayerFromHit(pos)
+	local ray = Camera:ScreenPointToRay(pos.X, pos.Y)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+	params.FilterDescendantsInstances = {LocalPlayer.Character}
+
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
+	if not result then return nil end
+
+	local model = result.Instance:FindFirstAncestorOfClass("Model")
+	if not model then return nil end
+
+	return Players:GetPlayerFromCharacter(model)
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
 	if not isAllowed(LocalPlayer) then return end
 
-	local target = Mouse.Target
-	if not target then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
 
-	local model = target:FindFirstAncestorOfClass("Model")
-	if not model then return end
+		local pos = UserInputService:GetMouseLocation()
+		local plr = getPlayerFromHit(pos)
 
-	local plr = Players:GetPlayerFromCharacter(model)
-	if plr and plr ~= LocalPlayer then
-		selectedPlayer = plr
+		if plr and plr ~= LocalPlayer then
+			selectedPlayer = plr
+		end
 	end
 end)

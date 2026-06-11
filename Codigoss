@@ -1,314 +1,194 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
+local MAX_WALKSPEED = 36
+local MAX_JUMPPOWER = 80
+local MAX_AIR_JUMPS = 2
 
-local allowedUsers = {
-	["kit_cynALT"] = true,
-	[12345678] = true,
-	[23456789] = true,
-	[34567890] = true,
-	[45678901] = true,
-	[56789012] = true
+local Blacklist = {
+	["dex"] = true,
+	["infinity yield"] = true,
+	["spy remote"] = true,
+	["simplespy for mobile"] = true,
+	["hydroxide"] = true,
+	["synapse"] = true,
+	["krnl"] = true,
+	["fluxus"] = true,
+	["delta"] = true,
+	["executor"] = true,
+	["arceus"] = true,
+	["esp"] = true
 }
 
-local function isAllowed(plr)
-	return allowedUsers[plr.Name] == true or allowedUsers[plr.UserId] == true
+local function IsBlacklisted(text)
+	if not text then
+		return false
+	end
+
+	text = string.lower(tostring(text))
+	text = text:gsub("%s+", " ")
+	text = text:gsub("^%s+", "")
+	text = text:gsub("%s+$", "")
+
+	return Blacklist[text] == true
 end
 
-local function getChar(plr)
-	return plr.Character
-end
+local function CheckObject(obj, player)
+	if not obj then
+		return
+	end
 
-local function getRoot(char)
-	return char and char:FindFirstChild("HumanoidRootPart")
-end
+	if IsBlacklisted(obj.Name) then
+		player:Kick("Exploiting | Code : 4")
+		return
+	end
 
-local function getHum(char)
-	return char and char:FindFirstChildOfClass("Humanoid")
-end
+	if obj:IsA("ScreenGui") then
+		pcall(function()
+			if IsBlacklisted(obj.DisplayName) then
+				player:Kick("Exploiting | Code : 5")
+			end
+		end)
+	end
 
-local function kill(plr)
-	local hum = getHum(getChar(plr))
-	if hum then hum.Health = 0 end
-end
-
-local function bring(plr)
-	local char = getChar(plr)
-	local root = getRoot(char)
-	local myRoot = getRoot(getChar(LocalPlayer))
-	if root and myRoot then
-		root.CFrame = myRoot.CFrame * CFrame.new(2,0,0)
+	if obj:IsA("TextLabel")
+	or obj:IsA("TextButton")
+	or obj:IsA("TextBox") then
+		pcall(function()
+			if IsBlacklisted(obj.Text) then
+				player:Kick("Exploiting | Code : 6")
+			end
+		end)
 	end
 end
 
-local function void(plr)
-	local root = getRoot(getChar(plr))
-	if root then
-		root.CFrame = CFrame.new(0, -5000, 0)
+local function StartGuiDetection(player)
+	for _, obj in ipairs(CoreGui:GetDescendants()) do
+		CheckObject(obj, player)
 	end
+
+	CoreGui.DescendantAdded:Connect(function(obj)
+		task.wait(0.5)
+		CheckObject(obj, player)
+	end)
 end
 
-local function fling(plr)
-	local root = getRoot(getChar(plr))
-	if root then
-		local bv = Instance.new("BodyVelocity")
-		bv.Velocity = Vector3.new(1,1,1) * 5000
-		bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-		bv.Parent = root
-		Debris:AddItem(bv, 0.3)
-	end
-end
+local function DetectInfinityJump(player, humanoid, root)
+	local airJumps = 0
+	local lastJump = 0
 
-local function sit(plr)
-	local hum = getHum(getChar(plr))
-	if hum then hum.Sit = true end
-end
+	humanoid.StateChanged:Connect(function(_, newState)
+		if newState == Enum.HumanoidStateType.Landed
+		or newState == Enum.HumanoidStateType.Running then
+			airJumps = 0
+		elseif newState == Enum.HumanoidStateType.Jumping then
+			local now = tick()
 
-local function freeze(plr)
-	local root = getRoot(getChar(plr))
-	if root then root.Anchored = true end
-end
+			if humanoid.FloorMaterial == Enum.Material.Air then
+				if math.abs(root.AssemblyLinearVelocity.Y) > 80 then
+					return
+				end
 
-local function unfreeze(plr)
-	local root = getRoot(getChar(plr))
-	if root then root.Anchored = false end
-end
+				if now - lastJump < 1 then
+					airJumps += 1
 
-local function kick(plr, reason)
-	plr:Kick(reason or "Kicked")
-end
+					if airJumps >= MAX_AIR_JUMPS then
+						player:Kick("Infinity Jump Detected | Code : 7")
+					end
+				end
+			end
 
-pcall(function()
-	CoreGui:FindFirstChild("PlayerPanelGui"):Destroy()
-end)
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "PlayerPanelGui"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = CoreGui
-
-local selectedPlayer
-local viewing = false
-
-local highlight = Instance.new("Highlight")
-highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-highlight.FillColor = Color3.fromRGB(255,70,70)
-highlight.OutlineColor = Color3.new(1,1,1)
-highlight.FillTransparency = 0.8
-highlight.Parent = gui
-
-local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0,0,0,0)
-panel.Position = UDim2.new(1,-235,0.5,-180)
-panel.BackgroundColor3 = Color3.fromRGB(20,20,20)
-panel.BorderSizePixel = 0
-panel.ClipsDescendants = true
-panel.Visible = false
-panel.Parent = gui
-
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0,14)
-
-local top = Instance.new("Frame")
-top.Size = UDim2.new(1,0,0,42)
-top.BackgroundTransparency = 1
-top.Parent = panel
-
-local avatar = Instance.new("ImageLabel")
-avatar.Size = UDim2.new(0,42,0,42)
-avatar.Position = UDim2.new(0,10,0,8)
-avatar.BackgroundTransparency = 1
-avatar.Parent = panel
-
-Instance.new("UICorner", avatar).CornerRadius = UDim.new(1,0)
-
-local playerText = Instance.new("TextLabel")
-playerText.BackgroundTransparency = 1
-playerText.Position = UDim2.new(0,62,0,10)
-playerText.Size = UDim2.new(1,-110,0,18)
-playerText.Font = Enum.Font.GothamBold
-playerText.TextColor3 = Color3.new(1,1,1)
-playerText.TextSize = 14
-playerText.TextXAlignment = Enum.TextXAlignment.Left
-playerText.Parent = panel
-
-local subText = Instance.new("TextLabel")
-subText.BackgroundTransparency = 1
-subText.Position = UDim2.new(0,62,0,27)
-subText.Size = UDim2.new(1,-110,0,14)
-subText.Font = Enum.Font.Gotham
-subText.TextColor3 = Color3.fromRGB(170,170,170)
-subText.TextSize = 11
-subText.TextXAlignment = Enum.TextXAlignment.Left
-subText.Parent = panel
-
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0,24,0,24)
-close.Position = UDim2.new(1,-32,0,10)
-close.BackgroundColor3 = Color3.fromRGB(30,30,30)
-close.Text = "X"
-close.Font = Enum.Font.GothamBold
-close.TextColor3 = Color3.new(1,1,1)
-close.TextSize = 12
-close.Parent = panel
-Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
-
-local search = Instance.new("TextBox")
-search.Size = UDim2.new(1,-20,0,32)
-search.Position = UDim2.new(0,10,0,58)
-search.BackgroundColor3 = Color3.fromRGB(26,26,26)
-search.PlaceholderText = "Pesquisar cmd..."
-search.TextColor3 = Color3.new(1,1,1)
-search.Font = Enum.Font.Gotham
-search.TextSize = 13
-search.ClearTextOnFocus = false
-search.Parent = panel
-Instance.new("UICorner", search).CornerRadius = UDim.new(0,10)
-
-local reasonBox = Instance.new("TextBox")
-reasonBox.Size = UDim2.new(1,-20,0,32)
-reasonBox.Position = UDim2.new(0,10,0,96)
-reasonBox.BackgroundColor3 = Color3.fromRGB(26,26,26)
-reasonBox.PlaceholderText = "Motivo | texto"
-reasonBox.TextColor3 = Color3.new(1,1,1)
-reasonBox.Font = Enum.Font.Gotham
-reasonBox.TextSize = 13
-reasonBox.ClearTextOnFocus = false
-reasonBox.Parent = panel
-Instance.new("UICorner", reasonBox).CornerRadius = UDim.new(0,10)
-
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1,-10,1,-143)
-scroll.Position = UDim2.new(0,5,0,138)
-scroll.BackgroundTransparency = 1
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 2
-scroll.Parent = panel
-
-local layout = Instance.new("UIListLayout", scroll)
-
-local buttons = {}
-
-local function closePanel()
-	panel.Visible = false
-	selectedPlayer = nil
-	viewing = false
-end
-
-close.MouseButton1Click:Connect(closePanel)
-
-local function createButton(name, callback)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1,-8,0,34)
-	button.BackgroundColor3 = Color3.fromRGB(28,28,28)
-	button.Text = name
-	button.TextColor3 = Color3.new(1,1,1)
-	button.Font = Enum.Font.GothamSemibold
-	button.TextSize = 13
-	button.Parent = scroll
-
-	Instance.new("UICorner", button).CornerRadius = UDim.new(0,10)
-
-	button.MouseButton1Click:Connect(function()
-		if selectedPlayer then
-			callback(selectedPlayer)
-			closePanel()
+			lastJump = now
 		end
 	end)
-
-	table.insert(buttons, button)
-	return button
 end
 
-createButton("Kill", kill)
-createButton("Bring", bring)
-createButton("Void", void)
-createButton("Fling", fling)
-createButton("Sit", sit)
-createButton("Freeze", freeze)
-createButton("Unfreeze", unfreeze)
-createButton("Kick", function(plr)
-	kick(plr, reasonBox.Text)
-end)
-
-search:GetPropertyChangedSignal("Text"):Connect(function()
-	local t = string.lower(search.Text)
-	for _,b in ipairs(buttons) do
-		b.Visible = t == "" or string.find(string.lower(b.Text), t)
+local function HasFlyObjects(character)
+	for _, obj in ipairs(character:GetDescendants()) do
+		if obj:IsA("BodyVelocity")
+		or obj:IsA("BodyGyro")
+		or obj:IsA("BodyPosition")
+		or obj:IsA("LinearVelocity")
+		or obj:IsA("VectorForce")
+		or obj:IsA("AlignPosition")
+		or obj:IsA("AlignOrientation") then
+			return true
+		end
 	end
-end)
 
-RunService.RenderStepped:Connect(function()
-	if selectedPlayer and selectedPlayer.Character then
-		highlight.Adornee = selectedPlayer.Character
-	end
-end)
-
-local function openPanel(plr)
-	if not isAllowed(LocalPlayer) then return end
-
-	selectedPlayer = plr
-	panel.Visible = true
-	panel.Size = UDim2.new(0,0,0,0)
-
-	playerText.Text = plr.DisplayName
-	subText.Text = "@"..plr.Name
-
-	local img = Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180x180)
-	avatar.Image = img
-
-	TweenService:Create(panel, TweenInfo.new(0.18), {
-		Size = UDim2.new(0,220,0,360)
-	}):Play()
+	return false
 end
 
-Mouse.Button1Down:Connect(function()
-	if not isAllowed(LocalPlayer) then return end
+local function DetectFly(player, character, humanoid, root)
+	local airTime = 0
 
-	local target = Mouse.Target
-	if not target then return end
+	while character.Parent do
+		if humanoid.FloorMaterial == Enum.Material.Air then
+			airTime += 1
 
-	local model = target:FindFirstAncestorOfClass("Model")
-	if not model then return end
+			local velocityY = math.abs(root.AssemblyLinearVelocity.Y)
 
-	local plr = Players:GetPlayerFromCharacter(model)
-	if plr and plr ~= LocalPlayer then
-		openPanel(plr)
+			if airTime >= 4 then
+				if velocityY < 2 and HasFlyObjects(character) then
+					player:Kick("Fly Detected | Code : 3")
+					break
+				end
+			end
+		else
+			airTime = 0
+		end
+
+		task.wait(1)
 	end
+end
+
+local function CheckCharacter(player, character)
+	local humanoid = character:WaitForChild("Humanoid", 5)
+	local root = character:WaitForChild("HumanoidRootPart", 5)
+
+	if not humanoid or not root then
+		return
+	end
+
+	DetectInfinityJump(player, humanoid, root)
+
+	task.spawn(function()
+		DetectFly(player, character, humanoid, root)
+	end)
+
+	while character.Parent do
+		if humanoid.WalkSpeed > MAX_WALKSPEED then
+			player:Kick("Cheat Detected | Code : 1")
+			break
+		end
+
+		if humanoid.UseJumpPower and humanoid.JumpPower > MAX_JUMPPOWER then
+			player:Kick("Cheat Detected | Code : 2")
+			break
+		end
+
+		task.wait(2)
+	end
+end
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		task.spawn(CheckCharacter, player, character)
+	end)
 end)
 
-Players.PlayerRemoving:Connect(function(plr)
-	if plr == selectedPlayer then
-		closePanel()
+for _, player in ipairs(Players:GetPlayers()) do
+	if player.Character then
+		task.spawn(CheckCharacter, player, player.Character)
 	end
-end)
 
-local dragging, startPos, dragStart
+	player.CharacterAdded:Connect(function(character)
+		task.spawn(CheckCharacter, player, character)
+	end)
+end
 
-top.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = panel.Position
-	end
-end)
-
-top.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-end)
+if Players.LocalPlayer then
+	task.spawn(function()
+		StartGuiDetection(Players.LocalPlayer)
+	end)
+end

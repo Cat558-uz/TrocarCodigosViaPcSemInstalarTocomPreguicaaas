@@ -1,194 +1,104 @@
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 
-local MAX_WALKSPEED = 36
-local MAX_JUMPPOWER = 80
-local MAX_AIR_JUMPS = 2
-
-local Blacklist = {
-	["dex"] = true,
-	["infinity yield"] = true,
-	["spy remote"] = true,
-	["simplespy for mobile"] = true,
-	["hydroxide"] = true,
-	["synapse"] = true,
-	["krnl"] = true,
-	["fluxus"] = true,
-	["delta"] = true,
-	["executor"] = true,
-	["arceus"] = true,
-	["esp"] = true
+local admins = {
+	["kit_cynALT"] = true,
+	["Admin1"] = true,
+	["Admin2"] = true,
+	["Admin3"] = true,
+	["Admin4"] = true
 }
 
-local function IsBlacklisted(text)
-	if not text then
-		return false
-	end
+local function getPlayer(str)
+	if not str then return nil end
+	str = str:lower()
 
-	text = string.lower(tostring(text))
-	text = text:gsub("%s+", " ")
-	text = text:gsub("^%s+", "")
-	text = text:gsub("%s+$", "")
-
-	return Blacklist[text] == true
-end
-
-local function CheckObject(obj, player)
-	if not obj then
-		return
-	end
-
-	if IsBlacklisted(obj.Name) then
-		player:Kick("Exploiting | Code : 4")
-		return
-	end
-
-	if obj:IsA("ScreenGui") then
-		pcall(function()
-			if IsBlacklisted(obj.DisplayName) then
-				player:Kick("Exploiting | Code : 5")
-			end
-		end)
-	end
-
-	if obj:IsA("TextLabel")
-	or obj:IsA("TextButton")
-	or obj:IsA("TextBox") then
-		pcall(function()
-			if IsBlacklisted(obj.Text) then
-				player:Kick("Exploiting | Code : 6")
-			end
-		end)
+	for _, v in ipairs(Players:GetPlayers()) do
+		if v.Name:lower():find(str, 1, true) or v.DisplayName:lower():find(str, 1, true) then
+			return v
+		end
 	end
 end
 
-local function StartGuiDetection(player)
-	for _, obj in ipairs(CoreGui:GetDescendants()) do
-		CheckObject(obj, player)
-	end
+local function getChar(plr)
+	return plr.Character
+end
 
-	CoreGui.DescendantAdded:Connect(function(obj)
-		task.wait(0.5)
-		CheckObject(obj, player)
+local function getRoot(char)
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum(char)
+	return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function isAdmin(plr)
+	return admins[plr.Name] == true
+end
+
+local function fling(char)
+	local root = getRoot(char)
+	if not root then return end
+
+	local bv = Instance.new("BodyVelocity")
+	bv.Velocity = Vector3.new(math.random(-500,500), math.random(200,600), math.random(-500,500))
+	bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+	bv.Parent = root
+
+	task.delay(0.25, function()
+		bv:Destroy()
 	end)
 end
 
-local function DetectInfinityJump(player, humanoid, root)
-	local airJumps = 0
-	local lastJump = 0
+local function handleCommand(plr, msg)
+	if not isAdmin(plr) then return end
+	if msg:sub(1,1) ~= ":" then return end
 
-	humanoid.StateChanged:Connect(function(_, newState)
-		if newState == Enum.HumanoidStateType.Landed
-		or newState == Enum.HumanoidStateType.Running then
-			airJumps = 0
-		elseif newState == Enum.HumanoidStateType.Jumping then
-			local now = tick()
+	local args = msg:sub(2):split(" ")
+	local cmd = args[1]
+	local targetStr = args[2]
+	local target = getPlayer(targetStr)
 
-			if humanoid.FloorMaterial == Enum.Material.Air then
-				if math.abs(root.AssemblyLinearVelocity.Y) > 80 then
-					return
-				end
+	if cmd == "kill" and target then
+		local hum = getHum(getChar(target))
+		if hum then hum.Health = 0 end
+	end
 
-				if now - lastJump < 1 then
-					airJumps += 1
-
-					if airJumps >= MAX_AIR_JUMPS then
-						player:Kick("Infinity Jump Detected | Code : 7")
-					end
-				end
-			end
-
-			lastJump = now
-		end
-	end)
-end
-
-local function HasFlyObjects(character)
-	for _, obj in ipairs(character:GetDescendants()) do
-		if obj:IsA("BodyVelocity")
-		or obj:IsA("BodyGyro")
-		or obj:IsA("BodyPosition")
-		or obj:IsA("LinearVelocity")
-		or obj:IsA("VectorForce")
-		or obj:IsA("AlignPosition")
-		or obj:IsA("AlignOrientation") then
-			return true
+	if cmd == "bring" and target then
+		local root1 = getRoot(getChar(plr))
+		local root2 = getRoot(getChar(target))
+		if root1 and root2 then
+			root2.CFrame = root1.CFrame * CFrame.new(2,0,0)
 		end
 	end
 
-	return false
-end
+	if cmd == "kick" and target then
+		target:Kick("Kicked by admin")
+	end
 
-local function DetectFly(player, character, humanoid, root)
-	local airTime = 0
+	if cmd == "sit" and target then
+		local hum = getHum(getChar(target))
+		if hum then hum.Sit = true end
+	end
 
-	while character.Parent do
-		if humanoid.FloorMaterial == Enum.Material.Air then
-			airTime += 1
+	if cmd == "fling" and target then
+		fling(getChar(target))
+	end
 
-			local velocityY = math.abs(root.AssemblyLinearVelocity.Y)
+	if cmd == "freeze" and target then
+		local char = getChar(target)
+		local root = getRoot(char)
+		if root then root.Anchored = true end
+	end
 
-			if airTime >= 4 then
-				if velocityY < 2 and HasFlyObjects(character) then
-					player:Kick("Fly Detected | Code : 3")
-					break
-				end
-			end
-		else
-			airTime = 0
-		end
-
-		task.wait(1)
+	if cmd == "unfreeze" and target then
+		local char = getChar(target)
+		local root = getRoot(char)
+		if root then root.Anchored = false end
 	end
 end
 
-local function CheckCharacter(player, character)
-	local humanoid = character:WaitForChild("Humanoid", 5)
-	local root = character:WaitForChild("HumanoidRootPart", 5)
-
-	if not humanoid or not root then
-		return
-	end
-
-	DetectInfinityJump(player, humanoid, root)
-
-	task.spawn(function()
-		DetectFly(player, character, humanoid, root)
-	end)
-
-	while character.Parent do
-		if humanoid.WalkSpeed > MAX_WALKSPEED then
-			player:Kick("Cheat Detected | Code : 1")
-			break
-		end
-
-		if humanoid.UseJumpPower and humanoid.JumpPower > MAX_JUMPPOWER then
-			player:Kick("Cheat Detected | Code : 2")
-			break
-		end
-
-		task.wait(2)
-	end
-end
-
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function(character)
-		task.spawn(CheckCharacter, player, character)
+Players.PlayerAdded:Connect(function(plr)
+	plr.Chatted:Connect(function(msg)
+		handleCommand(plr, msg)
 	end)
 end)
-
-for _, player in ipairs(Players:GetPlayers()) do
-	if player.Character then
-		task.spawn(CheckCharacter, player, player.Character)
-	end
-
-	player.CharacterAdded:Connect(function(character)
-		task.spawn(CheckCharacter, player, character)
-	end)
-end
-
-if Players.LocalPlayer then
-	task.spawn(function()
-		StartGuiDetection(Players.LocalPlayer)
-	end)
-end

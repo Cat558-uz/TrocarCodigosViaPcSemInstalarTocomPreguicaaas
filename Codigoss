@@ -1,256 +1,159 @@
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 
-local admins = {
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+
+local allowedUsers = {
 	["kit_cynALT"] = true,
 	["Xingling858"] = true,
-	["Admin2"] = true,
-	["Admin3"] = true,
-	["Admin4"] = true
+	[23456789] = true,
+	[34567890] = true,
+	[45678901] = true,
+	[56789012] = true
 }
 
-local jailed = {}
-local jailPos = {}
-local controlled = {}
-
-local function getPlayer(str)
-	if not str then return nil end
-	str = str:lower()
-
-	for _, v in ipairs(Players:GetPlayers()) do
-		if v.Name:lower():find(str, 1, true)
-		or v.DisplayName:lower():find(str, 1, true) then
-			return v
-		end
-	end
+local function isAllowed(plr)
+	return allowedUsers[plr.Name] == true or allowedUsers[plr.UserId] == true
 end
 
-local function char(plr)
+pcall(function()
+	CoreGui:FindFirstChild("PlayerPanelGui"):Destroy()
+end)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "PlayerPanelGui"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = CoreGui
+
+local selectedPlayer
+local viewing = false
+
+local function getChar(plr)
 	return plr.Character
 end
 
-local function root(c)
-	return c and c:FindFirstChild("HumanoidRootPart")
+local function getRoot(char)
+	return char and char:FindFirstChild("HumanoidRootPart")
 end
 
-local function hum(c)
-	return c and c:FindFirstChildOfClass("Humanoid")
+local function getHum(char)
+	return char and char:FindFirstChildOfClass("Humanoid")
 end
 
-local function isAdmin(plr)
-	return admins[plr.Name] == true
+local function kill(plr)
+	local hum = getHum(getChar(plr))
+	if hum then hum.Health = 0 end
 end
 
-local function flingPlayer(target, min, max)
-	local hrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local dir = Vector3.new(
-		math.random(-1,1),
-		math.random(1,2),
-		math.random(-1,1)
-	)
-
-	if dir.Magnitude == 0 then
-		dir = Vector3.new(0,1,0)
+local function bring(plr)
+	local char = getChar(plr)
+	local root = getRoot(char)
+	local myRoot = getRoot(getChar(LocalPlayer))
+	if root and myRoot then
+		root.CFrame = myRoot.CFrame * CFrame.new(2,0,0)
 	end
-
-	dir = dir.Unit
-
-	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = dir * math.random(min or 40, max or 80)
-	bv.MaxForce = Vector3.new(1e6,1e6,1e6)
-	bv.Parent = hrp
-
-	Debris:AddItem(bv, 0.5)
 end
 
-local function createJail(target)
-	if jailed[target] then return end
-
-	local char = target.Character
-	if not char then return end
-
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local basePos = hrp.Position
-	jailPos[target] = basePos
-
-	local parts = {}
-
-	local sizeX = 8
-	local sizeY = 12
-	local sizeZ = 8
-
-	local function newPart(size, cf)
-		local p = Instance.new("Part")
-		p.Size = size
-		p.Anchored = true
-		p.CanCollide = true
-		p.Material = Enum.Material.ForceField
-		p.Color = Color3.fromRGB(0,170,255)
-		p.CFrame = cf
-		p.Parent = workspace
-		return p
+local function void(plr)
+	local root = getRoot(getChar(plr))
+	if root then
+		root.CFrame = CFrame.new(0, -5000, 0)
 	end
+end
 
-	parts[1] = newPart(Vector3.new(sizeX, sizeY, 1), CFrame.new(basePos + Vector3.new(0, sizeY/2, sizeZ/2)))
-	parts[2] = newPart(Vector3.new(sizeX, sizeY, 1), CFrame.new(basePos + Vector3.new(0, sizeY/2, -sizeZ/2)))
-	parts[3] = newPart(Vector3.new(sizeZ, sizeY, 1), CFrame.new(basePos + Vector3.new(sizeX/2, sizeY/2, 0)) * CFrame.Angles(0,math.rad(90),0))
-	parts[4] = newPart(Vector3.new(sizeZ, sizeY, 1), CFrame.new(basePos + Vector3.new(-sizeX/2, sizeY/2, 0)) * CFrame.Angles(0,math.rad(90),0))
-	parts[5] = newPart(Vector3.new(sizeX, sizeZ, 1), CFrame.new(basePos + Vector3.new(0, sizeY, 0)) * CFrame.Angles(math.rad(90),0,0))
-	parts[6] = newPart(Vector3.new(sizeX, sizeZ, 1), CFrame.new(basePos + Vector3.new(0, 0, 0)) * CFrame.Angles(math.rad(90),0,0))
+local function fling(plr)
+	local root = getRoot(getChar(plr))
+	if root then
+		local bv = Instance.new("BodyVelocity")
+		bv.Velocity = Vector3.new(99999,99999,99999)
+		bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+		bv.Parent = root
+		game.Debris:AddItem(bv, 0.5)
+	end
+end
 
-	jailed[target] = { parts = parts }
+local function sit(plr)
+	local hum = getHum(getChar(plr))
+	if hum then hum.Sit = true end
+end
 
-	target.CharacterAdded:Connect(function(newChar)
-		task.wait(0.5)
-		local newHRP = newChar:FindFirstChild("HumanoidRootPart")
-		if newHRP and jailed[target] then
-			newHRP.CFrame = CFrame.new(jailPos[target] + Vector3.new(0,3,0))
+local function freeze(plr)
+	local root = getRoot(getChar(plr))
+	if root then root.Anchored = true end
+end
+
+local function unfreeze(plr)
+	local root = getRoot(getChar(plr))
+	if root then root.Anchored = false end
+end
+
+local function kick(plr, reason)
+	plr:Kick(reason or "Kicked")
+end
+
+local function createButton(parent, text, callback)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-8,0,34)
+	b.BackgroundColor3 = Color3.fromRGB(28,28,28)
+	b.Text = text
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.GothamSemibold
+	b.TextSize = 13
+	b.Parent = parent
+
+	local c = Instance.new("UICorner", b)
+	c.CornerRadius = UDim.new(0,10)
+
+	b.MouseButton1Click:Connect(function()
+		if selectedPlayer then
+			callback(selectedPlayer)
 		end
 	end)
+
+	return b
 end
 
-local function removeJail(target)
-	local data = jailed[target]
-	if not data then return end
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0,220,0,360)
+panel.Position = UDim2.new(1,-235,0.5,-180)
+panel.BackgroundColor3 = Color3.fromRGB(20,20,20)
+panel.Parent = gui
 
-	for _,p in ipairs(data.parts) do
-		if p then p:Destroy() end
-	end
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1,-10,1,-10)
+scroll.Position = UDim2.new(0,5,0,5)
+scroll.Parent = panel
 
-	jailed[target] = nil
-	jailPos[target] = nil
-end
+local layout = Instance.new("UIListLayout", scroll)
 
-local function control(plr, target)
-	controlled[target] = plr
-end
-
-local function uncontrol(target)
-	controlled[target] = nil
-end
-
-RunService.Heartbeat:Connect(function()
-	for target, controller in pairs(controlled) do
-		local tc = char(target)
-		local cc = char(controller)
-
-		local tr = root(tc)
-		local cr = root(cc)
-
-		if tr and cr then
-			tr.Anchored = false
-			tr.CFrame = cr.CFrame * CFrame.new(2, 0, 0)
-		end
-	end
+createButton(scroll,"Kill",kill)
+createButton(scroll,"Bring",bring)
+createButton(scroll,"Void",void)
+createButton(scroll,"Fling",fling)
+createButton(scroll,"Sit",sit)
+createButton(scroll,"Freeze",freeze)
+createButton(scroll,"Unfreeze",unfreeze)
+createButton(scroll,"Kick",function(plr)
+	kick(plr, "Admin command")
 end)
 
-local function shutdown()
-	for _, v in ipairs(Players:GetPlayers()) do
-		v:Kick("Server shutdown")
+Mouse.Button1Down:Connect(function()
+	if not isAllowed(LocalPlayer) then return end
+
+	local target = Mouse.Target
+	if not target then return end
+
+	local model = target:FindFirstAncestorOfClass("Model")
+	if not model then return end
+
+	local plr = Players:GetPlayerFromCharacter(model)
+	if plr and plr ~= LocalPlayer then
+		selectedPlayer = plr
 	end
-end
-
-local function handle(plr, msg)
-	if not isAdmin(plr) then return end
-	if msg:sub(1,1) ~= ":" then return end
-
-	local args = msg:sub(2):split(" ")
-	local cmd = args[1]
-	local t = args[2]
-	local reason = table.concat(args, " ", 3)
-
-	local target = getPlayer(t)
-
-	if cmd == "kill" and target then
-		local h = hum(char(target))
-		if h then h.Health = 0 end
-	end
-
-	if cmd == "bring" and target then
-		local r1 = root(char(plr))
-		local r2 = root(char(target))
-		if r1 and r2 then
-			r2.CFrame = r1.CFrame * CFrame.new(2,0,0)
-		end
-	end
-
-	if cmd == "kick" and target then
-		if reason == "" then
-			target:Kick("Kicked by admin")
-		else
-			target:Kick(reason)
-		end
-	end
-
-	if cmd == "sit" and target then
-		local h = hum(char(target))
-		if h then
-			h.Sit = true
-			h:ChangeState(Enum.HumanoidStateType.Seated)
-		end
-	end
-
-	if cmd == "fling" and target then
-		flingPlayer(target, 60, 120)
-	end
-
-	if cmd == "freeze" and target then
-		local r = root(char(target))
-		if r then r.Anchored = true end
-	end
-
-	if cmd == "unfreeze" and target then
-		local r = root(char(target))
-		if r then r.Anchored = false end
-	end
-
-	if cmd == "shutdown" then
-		shutdown()
-	end
-
-	if cmd == "jaill" and target then
-		createJail(target)
-	end
-
-	if cmd == "unjaill" and target then
-		removeJail(target)
-	end
-
-	if cmd == "control" and target then
-		control(plr, target)
-	end
-
-	if cmd == "uncontrol" and target then
-		uncontrol(target)
-	end
-
-	if cmd == "float" and target then
-		local hrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-		if hrp and not hrp:FindFirstChild("FLOAT_BV") then
-			local bv = Instance.new("BodyVelocity")
-			bv.Name = "FLOAT_BV"
-			bv.Velocity = Vector3.new(0,50,0)
-			bv.MaxForce = Vector3.new(0,1e5,0)
-			bv.Parent = hrp
-		end
-	end
-
-	if cmd == "unfloat" and target then
-		local hrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local bv = hrp:FindFirstChild("FLOAT_BV")
-			if bv then bv:Destroy() end
-		end
-	end
-end
-
-Players.PlayerAdded:Connect(function(plr)
-	plr.Chatted:Connect(function(msg)
-		handle(plr, msg)
-	end)
 end)

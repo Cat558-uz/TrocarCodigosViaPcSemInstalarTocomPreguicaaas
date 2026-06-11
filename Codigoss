@@ -2,11 +2,13 @@ local Players = game:GetService("Players")
 
 local admins = {
 	["kit_cynALT"] = true,
-	["Admin1"] = true,
+	["Xingling858"] = true,
 	["Admin2"] = true,
 	["Admin3"] = true,
 	["Admin4"] = true
 }
+
+local jailed = {}
 
 local function getPlayer(str)
 	if not str then return nil end
@@ -19,15 +21,15 @@ local function getPlayer(str)
 	end
 end
 
-local function getChar(plr)
+local function char(plr)
 	return plr.Character
 end
 
-local function getRoot(char)
+local function root(char)
 	return char and char:FindFirstChild("HumanoidRootPart")
 end
 
-local function getHum(char)
+local function hum(char)
 	return char and char:FindFirstChildOfClass("Humanoid")
 end
 
@@ -36,69 +38,136 @@ local function isAdmin(plr)
 end
 
 local function fling(char)
-	local root = getRoot(char)
-	if not root then return end
+	local r = root(char)
+	if not r then return end
 
-	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = Vector3.new(math.random(-500,500), math.random(200,600), math.random(-500,500))
-	bv.MaxForce = Vector3.new(1e9,1e9,1e9)
-	bv.Parent = root
-
-	task.delay(0.25, function()
-		bv:Destroy()
-	end)
+	r.AssemblyLinearVelocity = Vector3.new(
+		math.random(-250, 250),
+		math.random(200, 400),
+		math.random(-250, 250)
+	)
 end
 
-local function handleCommand(plr, msg)
+local function jail(target)
+	local c = char(target)
+	local r = root(c)
+	if not r then return end
+
+	jailed[target] = r.Position
+
+	r.Anchored = true
+end
+
+local function unjail(target)
+	local c = char(target)
+	local r = root(c)
+	if not r then return end
+
+	r.Anchored = false
+
+	if jailed[target] then
+		r.CFrame = CFrame.new(jailed[target] + Vector3.new(0,3,0))
+	end
+
+	jailed[target] = nil
+end
+
+local function control(plr, target)
+	local c = char(target)
+	local r = root(c)
+	if not r then return end
+
+	r:SetNetworkOwner(plr)
+end
+
+local function uncontrol(target)
+	local c = char(target)
+	local r = root(c)
+	if not r then return end
+
+	r:SetNetworkOwner(nil)
+end
+
+local function shutdown()
+	for _, v in ipairs(Players:GetPlayers()) do
+		v:Kick("Server shutdown")
+	end
+end
+
+local function handle(plr, msg)
 	if not isAdmin(plr) then return end
 	if msg:sub(1,1) ~= ":" then return end
 
 	local args = msg:sub(2):split(" ")
 	local cmd = args[1]
-	local targetStr = args[2]
-	local target = getPlayer(targetStr)
+	local t = args[2]
+	local reason = table.concat(args, " ", 3)
+
+	local target = getPlayer(t)
 
 	if cmd == "kill" and target then
-		local hum = getHum(getChar(target))
-		if hum then hum.Health = 0 end
+		local h = hum(char(target))
+		if h then h.Health = 0 end
 	end
 
 	if cmd == "bring" and target then
-		local root1 = getRoot(getChar(plr))
-		local root2 = getRoot(getChar(target))
-		if root1 and root2 then
-			root2.CFrame = root1.CFrame * CFrame.new(2,0,0)
+		local r1 = root(char(plr))
+		local r2 = root(char(target))
+		if r1 and r2 then
+			r2.CFrame = r1.CFrame * CFrame.new(2,0,0)
 		end
 	end
 
 	if cmd == "kick" and target then
-		target:Kick("Kicked by admin")
+		if reason == "" then
+			target:Kick("Kicked by admin")
+		else
+			target:Kick(reason)
+		end
 	end
 
 	if cmd == "sit" and target then
-		local hum = getHum(getChar(target))
-		if hum then hum.Sit = true end
+		local h = hum(char(target))
+		if h then h.Sit = true end
 	end
 
 	if cmd == "fling" and target then
-		fling(getChar(target))
+		fling(char(target))
 	end
 
 	if cmd == "freeze" and target then
-		local char = getChar(target)
-		local root = getRoot(char)
-		if root then root.Anchored = true end
+		local r = root(char(target))
+		if r then r.Anchored = true end
 	end
 
 	if cmd == "unfreeze" and target then
-		local char = getChar(target)
-		local root = getRoot(char)
-		if root then root.Anchored = false end
+		local r = root(char(target))
+		if r then r.Anchored = false end
+	end
+
+	if cmd == "shutdown" then
+		shutdown()
+	end
+
+	if cmd == "jail" and target then
+		jail(target)
+	end
+
+	if cmd == "unjail" and target then
+		unjail(target)
+	end
+
+	if cmd == "control" and target then
+		control(plr, target)
+	end
+
+	if cmd == "uncontrol" and target then
+		uncontrol(target)
 	end
 end
 
 Players.PlayerAdded:Connect(function(plr)
 	plr.Chatted:Connect(function(msg)
-		handleCommand(plr, msg)
+		handle(plr, msg)
 	end)
 end)

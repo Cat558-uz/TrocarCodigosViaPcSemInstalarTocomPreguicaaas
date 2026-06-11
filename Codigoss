@@ -1,173 +1,124 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-
-local allowedUsers = {
-	["kit_cynALT"] = true,
-	[12345678] = true,
-	[23456789] = true,
-	[34567890] = true,
-	[45678901] = true,
-	[56789012] = true
+local admins = {
+	kit_cynALT = true,
+	Xingling858 = true,
+	Admin2 = true,
+	Admin3 = true,
+	Admin4 = true
 }
 
-local function isAllowed(plr)
-	return allowedUsers[plr.Name] == true or allowedUsers[plr.UserId] == true
+local jailed = {}
+
+local function isAdmin(plr)
+	return admins[plr.Name] == true
 end
 
-pcall(function()
-	CoreGui:FindFirstChild("PlayerPanelGui"):Destroy()
-end)
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "PlayerPanelGui"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = CoreGui
-
-local selectedPlayer
-
-local function getChar(plr)
-	return plr.Character
+local function getCharacter(plr)
+	return plr and plr.Character
 end
 
 local function getRoot(char)
 	return char and char:FindFirstChild("HumanoidRootPart")
 end
 
-local function getHum(char)
+local function getHumanoid(char)
 	return char and char:FindFirstChildOfClass("Humanoid")
 end
 
+local function findPlayer(str)
+	if not str then return nil end
+	str = str:lower()
+
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Name:lower():sub(1, #str) == str or p.DisplayName:lower():sub(1, #str) == str then
+			return p
+		end
+	end
+end
+
 local function kill(plr)
-	local hum = getHum(getChar(plr))
+	local hum = getHumanoid(getCharacter(plr))
 	if hum then hum.Health = 0 end
 end
 
-local function bring(plr)
-	local char = getChar(plr)
-	local root = getRoot(char)
-	local myRoot = getRoot(getChar(LocalPlayer))
-	if root and myRoot then
-		root.CFrame = myRoot.CFrame * CFrame.new(2,0,0)
-	end
-end
-
-local function void(plr)
-	local root = getRoot(getChar(plr))
-	if root then
-		root.CFrame = CFrame.new(0, -5000, 0)
-	end
-end
-
-local function fling(plr)
-	local root = getRoot(getChar(plr))
-	if root then
-		local bv = Instance.new("BodyVelocity")
-		bv.Velocity = Vector3.new(1,1,1) * 5000
-		bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-		bv.Parent = root
-		game:GetService("Debris"):AddItem(bv, 0.3)
+local function bring(from, target)
+	local r1 = getRoot(getCharacter(from))
+	local r2 = getRoot(getCharacter(target))
+	if r1 and r2 then
+		r2.CFrame = r1.CFrame * CFrame.new(3, 0, 0)
 	end
 end
 
 local function sit(plr)
-	local hum = getHum(getChar(plr))
+	local hum = getHumanoid(getCharacter(plr))
 	if hum then hum.Sit = true end
 end
 
-local function freeze(plr)
-	local root = getRoot(getChar(plr))
-	if root then root.Anchored = true end
+local function freeze(plr, state)
+	local r = getRoot(getCharacter(plr))
+	if r then r.Anchored = state end
 end
 
-local function unfreeze(plr)
-	local root = getRoot(getChar(plr))
-	if root then root.Anchored = false end
+local function fling(char)
+	local root = getRoot(char)
+	if not root then return end
+
+	local bv = Instance.new("BodyVelocity")
+	bv.Velocity = Vector3.new(0, 500, 0)
+	bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	bv.Parent = root
+
+	game:GetService("Debris"):AddItem(bv, 0.3)
 end
 
 local function kick(plr, reason)
-	plr:Kick(reason or "Kicked")
-end
-
-local function createButton(parent, text, callback)
-	local b = Instance.new("TextButton")
-	b.Size = UDim2.new(1,-8,0,34)
-	b.BackgroundColor3 = Color3.fromRGB(28,28,28)
-	b.Text = text
-	b.TextColor3 = Color3.new(1,1,1)
-	b.Font = Enum.Font.GothamSemibold
-	b.TextSize = 13
-	b.Parent = parent
-
-	local c = Instance.new("UICorner", b)
-	c.CornerRadius = UDim.new(0,10)
-
-	b.MouseButton1Click:Connect(function()
-		if selectedPlayer then
-			callback(selectedPlayer)
-		end
-	end)
-
-	return b
-end
-
-local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0,220,0,360)
-panel.Position = UDim2.new(1,-235,0.5,-180)
-panel.BackgroundColor3 = Color3.fromRGB(20,20,20)
-panel.Parent = gui
-
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1,-10,1,-10)
-scroll.Position = UDim2.new(0,5,0,5)
-scroll.Parent = panel
-
-local layout = Instance.new("UIListLayout", scroll)
-
-createButton(scroll,"Kill",kill)
-createButton(scroll,"Bring",bring)
-createButton(scroll,"Void",void)
-createButton(scroll,"Fling",fling)
-createButton(scroll,"Sit",sit)
-createButton(scroll,"Freeze",freeze)
-createButton(scroll,"Unfreeze",unfreeze)
-createButton(scroll,"Kick",function(plr)
-	kick(plr, "Admin command")
-end)
-
-local function getPlayerFromHit(pos)
-	local ray = Camera:ScreenPointToRay(pos.X, pos.Y)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Blacklist
-	params.FilterDescendantsInstances = {LocalPlayer.Character}
-
-	local result = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
-	if not result then return nil end
-
-	local model = result.Instance:FindFirstAncestorOfClass("Model")
-	if not model then return nil end
-
-	return Players:GetPlayerFromCharacter(model)
-end
-
-UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if not isAllowed(LocalPlayer) then return end
-
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-	or input.UserInputType == Enum.UserInputType.Touch then
-
-		local pos = UserInputService:GetMouseLocation()
-		local plr = getPlayerFromHit(pos)
-
-		if plr and plr ~= LocalPlayer then
-			selectedPlayer = plr
-		end
+	if reason == "" then
+		plr:Kick("Kicked by admin")
+	else
+		plr:Kick(reason)
 	end
-end)
+end
+
+local function shutdown()
+	for _, p in ipairs(Players:GetPlayers()) do
+		p:Kick("Server Shutdown")
+	end
+end
+
+local function handle(plr, msg)
+	if not isAdmin(plr) then return end
+	if msg:sub(1, 1) ~= ":" then return end
+
+	local args = msg:sub(2):split(" ")
+	local cmd = args[1]
+	local targetName = args[2]
+	local reason = table.concat(args, " ", 3)
+
+	local target = findPlayer(targetName)
+
+	if cmd == "kill" and target then
+		kill(target)
+
+	elseif cmd == "bring" and target then
+		bring(plr, target)
+
+	elseif cmd == "kick" and target then
+		kick(target, reason)
+
+	elseif cmd == "sit" and target then
+		sit(target)
+
+	elseif cmd == "fling" and target then
+		fling(getCharacter(target))
+
+	elseif cmd == "freeze" and target then
+		freeze(target, true)
+
+	elseif cmd == "unfreeze" and target then
+		freeze(target, false)
+
+	elseif cmd == "shutdown" then
+		shutdown()
+	end
+end

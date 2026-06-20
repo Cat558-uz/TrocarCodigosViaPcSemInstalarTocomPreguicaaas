@@ -1,30 +1,85 @@
-local Tool = script.Parent
+local Toolbar = plugin:CreateToolbar("Ghost Tools")
 
-local EquipAnimation = Instance.new("Animation")
-EquipAnimation.AnimationId = "rbxassetid://ID_DA_ANIMACAO_EQUIPAR"
+local Button = Toolbar:CreateButton(
+    "Part Finder",
+    "Selecionar partes",
+    ""
+)
 
-local UnequipAnimation = Instance.new("Animation")
-UnequipAnimation.AnimationId = "rbxassetid://ID_DA_ANIMACAO_DESEQUIPAR"
+local WidgetInfo = DockWidgetPluginGuiInfo.new(
+    Enum.InitialDockState.Left,
+    true,
+    true,
+    300,
+    400,
+    250,
+    300
+)
 
-local EquipTrack
-local UnequipTrack
+local Widget = plugin:CreateDockWidgetPluginGui("PartFinder", WidgetInfo)
+Widget.Title = "Part Finder"
 
-Tool.Equipped:Connect(function()
-	local Character = Tool.Parent
-	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.fromScale(1,1)
+Frame.Parent = Widget
 
-	if Humanoid then
-		EquipTrack = Humanoid:LoadAnimation(EquipAnimation)
-		EquipTrack:Play()
+local SearchBox = Instance.new("TextBox")
+SearchBox.Size = UDim2.new(1,-10,0,30)
+SearchBox.Position = UDim2.new(0,5,0,5)
+SearchBox.PlaceholderText = "Nome da Parte..."
+SearchBox.Parent = Frame
+
+local List = Instance.new("ScrollingFrame")
+List.Size = UDim2.new(1,-10,1,-45)
+List.Position = UDim2.new(0,5,0,40)
+List.CanvasSize = UDim2.new()
+List.Parent = Frame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Parent = List
+
+local Selection = game:GetService("Selection")
+
+local function Refresh()
+	for _,v in ipairs(List:GetChildren()) do
+		if v:IsA("TextButton") then
+			v:Destroy()
+		end
 	end
-end)
 
-Tool.Unequipped:Connect(function()
-	local Character = Tool.Parent
-	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	local Search = SearchBox.Text:lower()
 
-	if Humanoid then
-		UnequipTrack = Humanoid:LoadAnimation(UnequipAnimation)
-		UnequipTrack:Play()
+	for _,Obj in ipairs(workspace:GetDescendants()) do
+		if Obj:IsA("BasePart") and Obj.Name:lower():find(Search) then
+			local Btn = Instance.new("TextButton")
+			Btn.Size = UDim2.new(1,-5,0,25)
+			Btn.Text = Obj:GetFullName()
+			Btn.Parent = List
+
+			Btn.MouseButton1Click:Connect(function()
+				Selection:Set({Obj})
+
+				local Box = Instance.new("SelectionBox")
+				Box.Adornee = Obj
+				Box.LineThickness = 0.05
+				Box.Parent = Obj
+
+				task.delay(3,function()
+					if Box then
+						Box:Destroy()
+					end
+				end)
+			end)
+		end
 	end
+
+	task.wait()
+	List.CanvasSize = UDim2.new(0,0,0,Layout.AbsoluteContentSize.Y)
+end
+
+SearchBox:GetPropertyChangedSignal("Text"):Connect(Refresh)
+
+Button.Click:Connect(function()
+	Widget.Enabled = not Widget.Enabled
+	Refresh()
 end)

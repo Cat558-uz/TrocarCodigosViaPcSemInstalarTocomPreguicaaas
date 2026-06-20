@@ -1,124 +1,30 @@
-local Players = game:GetService("Players")
+local Tool = script.Parent
 
-local admins = {
-	kit_cynALT = true,
-	Xingling858 = true,
-	Admin2 = true,
-	Admin3 = true,
-	Admin4 = true
-}
+local EquipAnimation = Instance.new("Animation")
+EquipAnimation.AnimationId = "rbxassetid://ID_DA_ANIMACAO_EQUIPAR"
 
-local jailed = {}
+local UnequipAnimation = Instance.new("Animation")
+UnequipAnimation.AnimationId = "rbxassetid://ID_DA_ANIMACAO_DESEQUIPAR"
 
-local function isAdmin(plr)
-	return admins[plr.Name] == true
-end
+local EquipTrack
+local UnequipTrack
 
-local function getCharacter(plr)
-	return plr and plr.Character
-end
+Tool.Equipped:Connect(function()
+	local Character = Tool.Parent
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 
-local function getRoot(char)
-	return char and char:FindFirstChild("HumanoidRootPart")
-end
-
-local function getHumanoid(char)
-	return char and char:FindFirstChildOfClass("Humanoid")
-end
-
-local function findPlayer(str)
-	if not str then return nil end
-	str = str:lower()
-
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Name:lower():sub(1, #str) == str or p.DisplayName:lower():sub(1, #str) == str then
-			return p
-		end
+	if Humanoid then
+		EquipTrack = Humanoid:LoadAnimation(EquipAnimation)
+		EquipTrack:Play()
 	end
-end
+end)
 
-local function kill(plr)
-	local hum = getHumanoid(getCharacter(plr))
-	if hum then hum.Health = 0 end
-end
+Tool.Unequipped:Connect(function()
+	local Character = Tool.Parent
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 
-local function bring(from, target)
-	local r1 = getRoot(getCharacter(from))
-	local r2 = getRoot(getCharacter(target))
-	if r1 and r2 then
-		r2.CFrame = r1.CFrame * CFrame.new(3, 0, 0)
+	if Humanoid then
+		UnequipTrack = Humanoid:LoadAnimation(UnequipAnimation)
+		UnequipTrack:Play()
 	end
-end
-
-local function sit(plr)
-	local hum = getHumanoid(getCharacter(plr))
-	if hum then hum.Sit = true end
-end
-
-local function freeze(plr, state)
-	local r = getRoot(getCharacter(plr))
-	if r then r.Anchored = state end
-end
-
-local function fling(char)
-	local root = getRoot(char)
-	if not root then return end
-
-	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = Vector3.new(0, 500, 0)
-	bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-	bv.Parent = root
-
-	game:GetService("Debris"):AddItem(bv, 0.3)
-end
-
-local function kick(plr, reason)
-	if reason == "" then
-		plr:Kick("Kicked by admin")
-	else
-		plr:Kick(reason)
-	end
-end
-
-local function shutdown()
-	for _, p in ipairs(Players:GetPlayers()) do
-		p:Kick("Server Shutdown")
-	end
-end
-
-local function handle(plr, msg)
-	if not isAdmin(plr) then return end
-	if msg:sub(1, 1) ~= ":" then return end
-
-	local args = msg:sub(2):split(" ")
-	local cmd = args[1]
-	local targetName = args[2]
-	local reason = table.concat(args, " ", 3)
-
-	local target = findPlayer(targetName)
-
-	if cmd == "kill" and target then
-		kill(target)
-
-	elseif cmd == "bring" and target then
-		bring(plr, target)
-
-	elseif cmd == "kick" and target then
-		kick(target, reason)
-
-	elseif cmd == "sit" and target then
-		sit(target)
-
-	elseif cmd == "fling" and target then
-		fling(getCharacter(target))
-
-	elseif cmd == "freeze" and target then
-		freeze(target, true)
-
-	elseif cmd == "unfreeze" and target then
-		freeze(target, false)
-
-	elseif cmd == "shutdown" then
-		shutdown()
-	end
-end
+end)

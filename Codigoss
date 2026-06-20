@@ -1,85 +1,133 @@
-local Toolbar = plugin:CreateToolbar("Ghost Tools")
+local toolbar = plugin:CreateToolbar("Ghost Tools")
 
-local Button = Toolbar:CreateButton(
-    "Part Finder",
-    "Selecionar partes",
-    ""
+local toggleBtn = toolbar:CreateButton(
+	"Finder",
+	"Abrir/fechar Part Finder",
+	""
 )
 
-local WidgetInfo = DockWidgetPluginGuiInfo.new(
-    Enum.InitialDockState.Left,
-    true,
-    true,
-    300,
-    400,
-    250,
-    300
+local widgetInfo = DockWidgetPluginGuiInfo.new(
+	Enum.InitialDockState.Float,
+	false,
+	false,
+	320,
+	420,
+	260,
+	300
 )
 
-local Widget = plugin:CreateDockWidgetPluginGui("PartFinder", WidgetInfo)
-Widget.Title = "Part Finder"
+local widget = plugin:CreateDockWidgetPluginGui("GhostPartFinder", widgetInfo)
+widget.Title = "Part Finder"
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.fromScale(1,1)
-Frame.Parent = Widget
+local main = Instance.new("Frame")
+main.Size = UDim2.fromScale(1, 1)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.Parent = widget
 
-local SearchBox = Instance.new("TextBox")
-SearchBox.Size = UDim2.new(1,-10,0,30)
-SearchBox.Position = UDim2.new(0,5,0,5)
-SearchBox.PlaceholderText = "Nome da Parte..."
-SearchBox.Parent = Frame
+local search = Instance.new("TextBox")
+search.Size = UDim2.new(1, -10, 0, 32)
+search.Position = UDim2.new(0, 5, 0, 5)
+search.PlaceholderText = "Procurar parte..."
+search.Text = ""
+search.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+search.TextColor3 = Color3.fromRGB(255, 255, 255)
+search.ClearTextOnFocus = false
+search.Parent = main
 
-local List = Instance.new("ScrollingFrame")
-List.Size = UDim2.new(1,-10,1,-45)
-List.Position = UDim2.new(0,5,0,40)
-List.CanvasSize = UDim2.new()
-List.Parent = Frame
+local list = Instance.new("ScrollingFrame")
+list.Size = UDim2.new(1, -10, 1, -45)
+list.Position = UDim2.new(0, 5, 0, 42)
+list.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+list.ScrollBarThickness = 6
+list.Parent = main
 
-local Layout = Instance.new("UIListLayout")
-Layout.Parent = List
+local layout = Instance.new("UIListLayout")
+layout.Parent = list
+
+local info = Instance.new("Frame")
+info.Size = UDim2.new(0, 280, 0, 160)
+info.Position = UDim2.new(0, 10, 1, -170)
+info.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+info.Visible = false
+info.Parent = main
+
+local function makeLabel(y, text)
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.new(1, -10, 0, 20)
+	t.Position = UDim2.new(0, 5, 0, y)
+	t.BackgroundTransparency = 1
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	t.TextColor3 = Color3.fromRGB(255, 255, 255)
+	t.Text = text
+	t.Parent = info
+	return t
+end
+
+local nameLabel = makeLabel(5, "")
+local posLabel = makeLabel(25, "")
+local rotLabel = makeLabel(45, "")
+local sizeLabel = makeLabel(65, "")
+local extraLabel = makeLabel(85, "")
 
 local Selection = game:GetService("Selection")
+local camera = workspace.CurrentCamera
 
-local function Refresh()
-	for _,v in ipairs(List:GetChildren()) do
+local function focusPart(part)
+	if not part then return end
+	local cf = part.CFrame * CFrame.new(0, 0, -10)
+	camera.CFrame = CFrame.new(cf.Position, part.Position)
+end
+
+local function showInfo(part)
+	if not part then return end
+
+	info.Visible = true
+
+	nameLabel.Text = part.Name
+	posLabel.Text = "Pos: " .. tostring(part.Position)
+	rotLabel.Text = "Rot: " .. tostring(part.Orientation)
+	sizeLabel.Text = "Size: " .. tostring(part.Size)
+	extraLabel.Text = "Anchored: " .. tostring(part.Anchored) .. " | Material: " .. tostring(part.Material)
+end
+
+local function clearList()
+	for _, v in ipairs(list:GetChildren()) do
 		if v:IsA("TextButton") then
 			v:Destroy()
 		end
 	end
+end
 
-	local Search = SearchBox.Text:lower()
+local function refresh()
+	clearList()
 
-	for _,Obj in ipairs(workspace:GetDescendants()) do
-		if Obj:IsA("BasePart") and Obj.Name:lower():find(Search) then
-			local Btn = Instance.new("TextButton")
-			Btn.Size = UDim2.new(1,-5,0,25)
-			Btn.Text = Obj:GetFullName()
-			Btn.Parent = List
+	local text = search.Text:lower()
 
-			Btn.MouseButton1Click:Connect(function()
-				Selection:Set({Obj})
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name:lower():find(text) then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, -6, 0, 28)
+			btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextXAlignment = Enum.TextXAlignment.Left
+			btn.Text = obj:GetFullName()
+			btn.Parent = list
 
-				local Box = Instance.new("SelectionBox")
-				Box.Adornee = Obj
-				Box.LineThickness = 0.05
-				Box.Parent = Obj
-
-				task.delay(3,function()
-					if Box then
-						Box:Destroy()
-					end
-				end)
+			btn.MouseButton1Click:Connect(function()
+				Selection:Set({obj})
+				showInfo(obj)
+				focusPart(obj)
 			end)
 		end
 	end
 
 	task.wait()
-	List.CanvasSize = UDim2.new(0,0,0,Layout.AbsoluteContentSize.Y)
+	list.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
-SearchBox:GetPropertyChangedSignal("Text"):Connect(Refresh)
+search:GetPropertyChangedSignal("Text"):Connect(refresh)
 
-Button.Click:Connect(function()
-	Widget.Enabled = not Widget.Enabled
-	Refresh()
+toggleBtn.Click:Connect(function()
+	widget.Enabled = not widget.Enabled
+	refresh()
 end)

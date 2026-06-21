@@ -1,133 +1,88 @@
-local toolbar = plugin:CreateToolbar("Ghost Tools")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
-local toggleBtn = toolbar:CreateButton(
-	"Finder",
-	"Abrir/fechar Part Finder",
-	""
-)
+local BALL_SIZE = 0.5
+local STEP_WAIT = 0.4
+local GROW_SIZE = 2
+local TEXTURE_ID = "rbxassetid://6927295847"
 
-local widgetInfo = DockWidgetPluginGuiInfo.new(
-	Enum.InitialDockState.Float,
-	false,
-	false,
-	320,
-	420,
-	260,
-	300
-)
+local function CreateBall(position)
+	local Ball = Instance.new("Part")
+	Ball.Shape = Enum.PartType.Ball
+	Ball.Size = Vector3.new(BALL_SIZE, BALL_SIZE, BALL_SIZE)
+	Ball.Position = position
+	Ball.Anchored = true
+	Ball.CanCollide = false
+	Ball.CastShadow = false
+	Ball.Material = Enum.Material.SmoothPlastic
 
-local widget = plugin:CreateDockWidgetPluginGui("GhostPartFinder", widgetInfo)
-widget.Title = "Part Finder"
-
-local main = Instance.new("Frame")
-main.Size = UDim2.fromScale(1, 1)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-main.Parent = widget
-
-local search = Instance.new("TextBox")
-search.Size = UDim2.new(1, -10, 0, 32)
-search.Position = UDim2.new(0, 5, 0, 5)
-search.PlaceholderText = "Procurar parte..."
-search.Text = ""
-search.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-search.TextColor3 = Color3.fromRGB(255, 255, 255)
-search.ClearTextOnFocus = false
-search.Parent = main
-
-local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -10, 1, -45)
-list.Position = UDim2.new(0, 5, 0, 42)
-list.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-list.ScrollBarThickness = 6
-list.Parent = main
-
-local layout = Instance.new("UIListLayout")
-layout.Parent = list
-
-local info = Instance.new("Frame")
-info.Size = UDim2.new(0, 280, 0, 160)
-info.Position = UDim2.new(0, 10, 1, -170)
-info.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-info.Visible = false
-info.Parent = main
-
-local function makeLabel(y, text)
-	local t = Instance.new("TextLabel")
-	t.Size = UDim2.new(1, -10, 0, 20)
-	t.Position = UDim2.new(0, 5, 0, y)
-	t.BackgroundTransparency = 1
-	t.TextXAlignment = Enum.TextXAlignment.Left
-	t.TextColor3 = Color3.fromRGB(255, 255, 255)
-	t.Text = text
-	t.Parent = info
-	return t
-end
-
-local nameLabel = makeLabel(5, "")
-local posLabel = makeLabel(25, "")
-local rotLabel = makeLabel(45, "")
-local sizeLabel = makeLabel(65, "")
-local extraLabel = makeLabel(85, "")
-
-local Selection = game:GetService("Selection")
-local camera = workspace.CurrentCamera
-
-local function focusPart(part)
-	if not part then return end
-	local cf = part.CFrame * CFrame.new(0, 0, -10)
-	camera.CFrame = CFrame.new(cf.Position, part.Position)
-end
-
-local function showInfo(part)
-	if not part then return end
-
-	info.Visible = true
-
-	nameLabel.Text = part.Name
-	posLabel.Text = "Pos: " .. tostring(part.Position)
-	rotLabel.Text = "Rot: " .. tostring(part.Orientation)
-	sizeLabel.Text = "Size: " .. tostring(part.Size)
-	extraLabel.Text = "Anchored: " .. tostring(part.Anchored) .. " | Material: " .. tostring(part.Material)
-end
-
-local function clearList()
-	for _, v in ipairs(list:GetChildren()) do
-		if v:IsA("TextButton") then
-			v:Destroy()
-		end
-	end
-end
-
-local function refresh()
-	clearList()
-
-	local text = search.Text:lower()
-
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		if obj:IsA("BasePart") and obj.Name:lower():find(text) then
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, -6, 0, 28)
-			btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			btn.TextXAlignment = Enum.TextXAlignment.Left
-			btn.Text = obj:GetFullName()
-			btn.Parent = list
-
-			btn.MouseButton1Click:Connect(function()
-				Selection:Set({obj})
-				showInfo(obj)
-				focusPart(obj)
-			end)
-		end
+	for _, Face in ipairs(Enum.NormalId:GetEnumItems()) do
+		local Texture = Instance.new("Texture")
+		Texture.Face = Face
+		Texture.Texture = TEXTURE_ID
+		Texture.StudsPerTileU = 3
+		Texture.StudsPerTileV = 3
+		Texture.Parent = Ball
 	end
 
-	task.wait()
-	list.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+	Ball.Parent = workspace
+
+	local Tween = TweenService:Create(
+		Ball,
+		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{
+			Size = Vector3.new(GROW_SIZE, GROW_SIZE, GROW_SIZE),
+			Transparency = 1
+		}
+	)
+
+	Tween:Play()
+
+	Tween.Completed:Once(function()
+		Ball:Destroy()
+	end)
 end
 
-search:GetPropertyChangedSignal("Text"):Connect(refresh)
+local function ApplyTrail(Character)
+	local Humanoid = Character:WaitForChild("Humanoid")
 
-toggleBtn.Click:Connect(function()
-	widget.Enabled = not widget.Enabled
-	refresh()
-end)
+	task.spawn(function()
+		local Left = true
+
+		while Character.Parent and Humanoid.Health > 0 do
+			if Humanoid.MoveDirection.Magnitude > 0 then
+				local Leg =
+					Character:FindFirstChild("LeftFoot")
+					or Character:FindFirstChild("Left Leg")
+
+				if not Left then
+					Leg =
+						Character:FindFirstChild("RightFoot")
+						or Character:FindFirstChild("Right Leg")
+				end
+
+				if Leg then
+					CreateBall(Leg.Position - Vector3.new(0, Leg.Size.Y / 2, 0))
+				end
+
+				Left = not Left
+			end
+
+			task.wait(STEP_WAIT)
+		end
+	end)
+end
+
+local function SetupPlayer(Player)
+	if Player.Character then
+		ApplyTrail(Player.Character)
+	end
+
+	Player.CharacterAdded:Connect(ApplyTrail)
+end
+
+for _, Player in ipairs(Players:GetPlayers()) do
+	SetupPlayer(Player)
+end
+
+Players.PlayerAdded:Connect(SetupPlayer)

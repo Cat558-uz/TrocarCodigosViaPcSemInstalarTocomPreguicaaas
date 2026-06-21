@@ -1,84 +1,84 @@
 local Players = game:GetService("Players")
+local Debris = game:GetService("Debris")
 local TweenService = game:GetService("TweenService")
 
-local BALL_SIZE = 0.5
-local STEP_WAIT = 0.4
-local GROW_SIZE = 2
-local TEXTURE_ID = "rbxassetid://6927295847"
+local BLOOD_AMOUNT = 35
+local BLOOD_SIZE = 0.35
+local BLOOD_TEXTURE = "rbxassetid://6927295847"
 
-local function CreateBall(position)
+local function CreateBlood(Position)
 	local Ball = Instance.new("Part")
 	Ball.Shape = Enum.PartType.Ball
-	Ball.Size = Vector3.new(BALL_SIZE, BALL_SIZE, BALL_SIZE)
-	Ball.Position = position
-	Ball.Anchored = true
-	Ball.CanCollide = false
-	Ball.CastShadow = false
+	Ball.Size = Vector3.new(BLOOD_SIZE, BLOOD_SIZE, BLOOD_SIZE)
+	Ball.Position = Position
 	Ball.Material = Enum.Material.SmoothPlastic
+	Ball.Color = Color3.fromRGB(170, 0, 0)
+	Ball.TopSurface = Enum.SurfaceType.Smooth
+	Ball.BottomSurface = Enum.SurfaceType.Smooth
+	Ball.CanCollide = false
+	Ball.Parent = workspace
 
 	for _, Face in ipairs(Enum.NormalId:GetEnumItems()) do
 		local Texture = Instance.new("Texture")
+		Texture.Texture = BLOOD_TEXTURE
 		Texture.Face = Face
-		Texture.Texture = TEXTURE_ID
-		Texture.StudsPerTileU = 3
-		Texture.StudsPerTileV = 3
+		Texture.StudsPerTileU = 1
+		Texture.StudsPerTileV = 1
+		Texture.Color3 = Color3.fromRGB(170, 0, 0)
 		Texture.Parent = Ball
 	end
 
-	Ball.Parent = workspace
-
-	local Tween = TweenService:Create(
-		Ball,
-		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{
-			Size = Vector3.new(GROW_SIZE, GROW_SIZE, GROW_SIZE),
-			Transparency = 1
-		}
+	local Velocity = Instance.new("BodyVelocity")
+	Velocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+	Velocity.Velocity = Vector3.new(
+		math.random(-25, 25),
+		math.random(8, 20),
+		math.random(-25, 25)
 	)
+	Velocity.Parent = Ball
 
-	Tween:Play()
+	Debris:AddItem(Velocity, 0.15)
 
-	Tween.Completed:Once(function()
-		Ball:Destroy()
+	task.delay(2, function()
+		local Tween = TweenService:Create(
+			Ball,
+			TweenInfo.new(1),
+			{
+				Transparency = 1,
+				Size = Vector3.new(0, 0, 0)
+			}
+		)
+
+		Tween:Play()
+		Tween.Completed:Once(function()
+			Ball:Destroy()
+		end)
 	end)
 end
 
-local function ApplyTrail(Character)
+local function SetupCharacter(Character)
 	local Humanoid = Character:WaitForChild("Humanoid")
+	local Root = Character:WaitForChild("HumanoidRootPart")
 
-	task.spawn(function()
-		local Left = true
-
-		while Character.Parent and Humanoid.Health > 0 do
-			if Humanoid.MoveDirection.Magnitude > 0 then
-				local Leg =
-					Character:FindFirstChild("LeftFoot")
-					or Character:FindFirstChild("Left Leg")
-
-				if not Left then
-					Leg =
-						Character:FindFirstChild("RightFoot")
-						or Character:FindFirstChild("Right Leg")
-				end
-
-				if Leg then
-					CreateBall(Leg.Position - Vector3.new(0, Leg.Size.Y / 2, 0))
-				end
-
-				Left = not Left
-			end
-
-			task.wait(STEP_WAIT)
+	Humanoid.Died:Connect(function()
+		for i = 1, BLOOD_AMOUNT do
+			CreateBlood(
+				Root.Position + Vector3.new(
+					math.random(-2, 2),
+					math.random(0, 2),
+					math.random(-2, 2)
+				)
+			)
 		end
 	end)
 end
 
 local function SetupPlayer(Player)
 	if Player.Character then
-		ApplyTrail(Player.Character)
+		SetupCharacter(Player.Character)
 	end
 
-	Player.CharacterAdded:Connect(ApplyTrail)
+	Player.CharacterAdded:Connect(SetupCharacter)
 end
 
 for _, Player in ipairs(Players:GetPlayers()) do

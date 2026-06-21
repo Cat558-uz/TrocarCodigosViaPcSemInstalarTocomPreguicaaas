@@ -1,88 +1,20 @@
+
 local Players = game:GetService("Players")
-local Debris = game:GetService("Debris")
-local TweenService = game:GetService("TweenService")
 
-local BLOOD_AMOUNT = 35
-local BLOOD_SIZE = 0.35
-local BLOOD_TEXTURE = "rbxassetid://6927295847"
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
-local function CreateBlood(Position)
-	local Ball = Instance.new("Part")
-	Ball.Shape = Enum.PartType.Ball
-	Ball.Size = Vector3.new(BLOOD_SIZE, BLOOD_SIZE, BLOOD_SIZE)
-	Ball.Position = Position
-	Ball.Material = Enum.Material.SmoothPlastic
-	Ball.Color = Color3.fromRGB(170, 0, 0)
-	Ball.TopSurface = Enum.SurfaceType.Smooth
-	Ball.BottomSurface = Enum.SurfaceType.Smooth
-	Ball.CanCollide = false
-	Ball.Parent = workspace
+local Menu = PlayerGui:WaitForChild("Menu") -- Nome da ScreenGui
 
-	for _, Face in ipairs(Enum.NormalId:GetEnumItems()) do
-		local Texture = Instance.new("Texture")
-		Texture.Texture = BLOOD_TEXTURE
-		Texture.Face = Face
-		Texture.StudsPerTileU = 1
-		Texture.StudsPerTileV = 1
-		Texture.Color3 = Color3.fromRGB(170, 0, 0)
-		Texture.Parent = Ball
-	end
+Menu.Enabled = true
 
-	local Velocity = Instance.new("BodyVelocity")
-	Velocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-	Velocity.Velocity = Vector3.new(
-		math.random(-25, 25),
-		math.random(8, 20),
-		math.random(-25, 25)
-	)
-	Velocity.Parent = Ball
-
-	Debris:AddItem(Velocity, 0.15)
-
-	task.delay(2, function()
-		local Tween = TweenService:Create(
-			Ball,
-			TweenInfo.new(1),
-			{
-				Transparency = 1,
-				Size = Vector3.new(0, 0, 0)
-			}
-		)
-
-		Tween:Play()
-		Tween.Completed:Once(function()
-			Ball:Destroy()
-		end)
-	end)
+local function AbrirMenu()
+	Menu.Enabled = true
 end
 
-local function SetupCharacter(Character)
-	local Humanoid = Character:WaitForChild("Humanoid")
-	local Root = Character:WaitForChild("HumanoidRootPart")
-
-	Humanoid.Died:Connect(function()
-		for i = 1, BLOOD_AMOUNT do
-			CreateBlood(
-				Root.Position + Vector3.new(
-					math.random(-2, 2),
-					math.random(0, 2),
-					math.random(-2, 2)
-				)
-			)
-		end
-	end)
+local function FecharMenu()
+	Menu.Enabled = false
 end
 
-local function SetupPlayer(Player)
-	if Player.Character then
-		SetupCharacter(Player.Character)
-	end
-
-	Player.CharacterAdded:Connect(SetupCharacter)
-end
-
-for _, Player in ipairs(Players:GetPlayers()) do
-	SetupPlayer(Player)
-end
-
-Players.PlayerAdded:Connect(SetupPlayer)
+AbrirMenu()   
+FecharMenu()  

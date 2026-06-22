@@ -1,20 +1,16 @@
+local Model = script.Parent
 
-local Players = game:GetService("Players")
+while true do
+	local Pivot = Model:GetPivot()
 
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+	Model:PivotTo(
+		CFrame.new(Pivot.Position) *
+		CFrame.Angles(
+			math.rad(math.random(0, 360)),
+			math.rad(math.random(0, 360)),
+			math.rad(math.random(0, 360))
+		)
+	)
 
-local Menu = PlayerGui:WaitForChild("Menu") -- Nome da ScreenGui
-
-Menu.Enabled = true
-
-local function AbrirMenu()
-	Menu.Enabled = true
+	task.wait(1)
 end
-
-local function FecharMenu()
-	Menu.Enabled = false
-end
-
-AbrirMenu()   
-FecharMenu()  

@@ -1,16 +1,50 @@
 local Model = script.Parent
+local TweenService = game:GetService("TweenService")
+
+local Base = Model.PrimaryPart or Model:FindFirstChildWhichIsA("BasePart")
+if not Base then
+	return
+end
+
+local Start = Base.CFrame
+local Angle = 0
 
 while true do
-	local Pivot = Model:GetPivot()
+	Angle += 25
 
-	Model:PivotTo(
-		CFrame.new(Pivot.Position) *
-		CFrame.Angles(
-			math.rad(math.random(0, 360)),
-			math.rad(math.random(0, 360)),
-			math.rad(math.random(0, 360))
-		)
+	local Up = TweenService:Create(
+		Base,
+		TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{
+			CFrame = Start
+				* CFrame.new(0, 0.1, 0)
+				* CFrame.Angles(
+					math.rad(math.sin(Angle) * 8),
+					math.rad(Angle),
+					math.rad(math.cos(Angle) * 8)
+				)
+		}
 	)
 
-	task.wait(1)
+	local Down = TweenService:Create(
+		Base,
+		TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+		{
+			CFrame = Start
+				* CFrame.new(0, 0, 0)
+				* CFrame.Angles(
+					math.rad(math.sin(Angle + 10) * 8),
+					math.rad(Angle + 15),
+					math.rad(math.cos(Angle + 10) * 8)
+				)
+		}
+	)
+
+	Up:Play()
+	Up.Completed:Wait()
+
+	Down:Play()
+	Down.Completed:Wait()
+
+	Start = Base.CFrame
 end
